@@ -29,11 +29,11 @@ Then you can run any python files here in the intial directory, for example:
 python app.py
 ```
 
-> Once the app is running, editing any code in `app/src` will automatically update in the container, and can be immediately executed.
+> Once the app is running, editing any code in `src/app` will automatically update in the container, and can be immediately executed.
 
 ## Teardown
 
-To reset the database and containers, run:
+To reset the database data and re-create containers, run:
 
 ```
 docker compose down
