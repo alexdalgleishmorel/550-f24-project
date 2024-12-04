@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  # MySQL DB for initial data storage
+  nyc_taxi_data_db:
+    image: mysql:8.0
+    container_name: nyc_taxi_data_db
+    environment:
+      MYSQL_DATABASE: nyc_taxi_data
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_PASSWORD: root
+    ports:
+      - "3306:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./scripts:/docker-entrypoint-initdb.d
+    networks:
+      - app_network
+
+  # Python environment for running pipeline and PySpark
+  python-app:
+    build:
+      context: ./src
+      dockerfile: Dockerfile
+    container_name: python-app
+    volumes:
+      - ./src/app:/app
+      - ./data:/data
+    working_dir: /app
+    environment:
+      - DB_HOST=nyc_taxi_data_db
+      - DB_USER=root
+      - DB_PASSWORD=root
+      - DB_NAME=nyc_taxi_data
+    depends_on:
+      - nyc_taxi_data_db
+    networks:
+      - app_network
+
+# Volumes for data persistence
+volumes:
+  db_data:
+
+# Network for internal communication
+networks:
+  app_network:
+    driver: bridge
