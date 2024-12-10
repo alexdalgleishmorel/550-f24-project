@@ -11,19 +11,21 @@ From the root of the project, run:
 docker compose up --build -d
 ```
 
-If this is your first time setting things up, wait for the database logs to finish initializing:
-
-```
-docker logs -f nyc_taxi_data_db
-```
-
-Once the setup is complete, bash into the container:
+To bash into the container:
 
 ```
 docker exec -it python-app bash
 ```
 
 Then you can run any python files here in the intial directory, for example:
+
+***For PySpark to work on the container, you need to run:***
+```
+export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-arm64
+export PATH=$JAVA_HOME/bin:$PATH
+```
+
+> This above command may differ on your machine, just check what's in `/usr/lib/jvm/` on the container.
 
 ```
 python app.py
@@ -33,10 +35,9 @@ python app.py
 
 ## Teardown
 
-To reset the database data and re-create containers, run:
+To reset and re-create containers, run:
 
 ```
 docker compose down
-docker volume rm 550-f24-project_db_data
 docker compose up --build -d
 ```
