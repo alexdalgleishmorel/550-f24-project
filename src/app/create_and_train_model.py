@@ -20,7 +20,7 @@ test_df = load_data(test_path)
 
 # DEFINING FEATURES
 feature_cols = ["pickup_longitude", "pickup_latitude", "dropoff_longitude", 
-                "dropoff_latitude", "passenger_count", "pickup_hour", "pickup_day"]
+                "dropoff_latitude", "passenger_count", "pickup_datetime"]
 
 assembler = VectorAssembler(inputCols=feature_cols, outputCol="features")
 
