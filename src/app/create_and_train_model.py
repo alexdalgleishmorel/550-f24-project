@@ -1,4 +1,5 @@
 from pyspark.sql import SparkSession
+import matplotlib.pyplot as plt
 from pyspark.sql.functions import to_timestamp, unix_timestamp, abs, col, hour, dayofweek, when, month, quarter, lit, sin, cos, radians, sqrt, atan2
 from pyspark.ml.feature import VectorAssembler, PolynomialExpansion, StandardScaler
 from pyspark.ml.regression import LinearRegression
@@ -27,8 +28,8 @@ test_df = load_data(test_path)
 # ------------------------
 def clean_data(df):
     df = df.withColumn("pickup_datetime", to_timestamp("pickup_datetime", "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"))
-    df = df.filter((df.trip_duration > 60) & (df.trip_duration < 7200))  # Trip duration between 1 min and 2 hrs
-    df = df.filter((df.pickup_longitude.between(-74.3, -73.7)) & (df.pickup_latitude.between(40.5, 41.0)))  # NYC bounds
+    df = df.filter((df.trip_duration > 60) & (df.trip_duration < 7200))
+    df = df.filter((df.pickup_longitude.between(-74.3, -73.7)) & (df.pickup_latitude.between(40.5, 41.0)))
     df = df.filter((df.dropoff_longitude.between(-74.3, -73.7)) & (df.dropoff_latitude.between(40.5, 41.0)))
     return df
 
@@ -45,7 +46,7 @@ test_df = test_df.withColumn("pickup_datetime_numeric", unix_timestamp("pickup_d
 # 2. Feature Enhancement
 # ------------------------
 def enhance_features(df):
-    R = 6371  # Earth radius in kilometers
+    R = 6371
     return (
         df.withColumn("hour_of_day", hour("pickup_datetime"))
         .withColumn("day_of_week", dayofweek("pickup_datetime"))
@@ -53,11 +54,11 @@ def enhance_features(df):
         .withColumn("month", month("pickup_datetime"))
         .withColumn("quarter", quarter("pickup_datetime"))
         .withColumn(
-            "season",  # Map months to seasons
-            when(col("month").isin(12, 1, 2), lit(1))  # Winter
-            .when(col("month").isin(3, 4, 5), lit(2))  # Spring
-            .when(col("month").isin(6, 7, 8), lit(3))  # Summer
-            .otherwise(lit(4)),  # Fall
+            "season",
+            when(col("month").isin(12, 1, 2), lit(1))
+            .when(col("month").isin(3, 4, 5), lit(2))
+            .when(col("month").isin(6, 7, 8), lit(3))
+            .otherwise(lit(4)),
         )
         .withColumn("lat_diff", abs(col("pickup_latitude") - col("dropoff_latitude")))
         .withColumn("lon_diff", abs(col("pickup_longitude") - col("dropoff_longitude")))
@@ -101,20 +102,16 @@ test_df = enhance_features(test_df)
 # ------------------------
 # 3. Polynomial Expansion (degree=3)
 # ------------------------
-# Define feature columns
 base_feature_cols = [
     "distance", "lat_diff", "lon_diff", "hour_of_day", "day_of_week", 
     "is_weekend", "is_rush_hour", "month", "quarter", "season", "passenger_count"
 ]
 assembler = VectorAssembler(inputCols=base_feature_cols, outputCol="raw_features")
 
-# Polynomial expansion to add non-linear feature interactions
 poly_expansion = PolynomialExpansion(degree=3, inputCol="raw_features", outputCol="expanded_features")
 
-# Standardization of expanded features
 scaler = StandardScaler(inputCol="expanded_features", outputCol="features", withStd=True, withMean=True)
 
-# Transform train, validation, and test data
 train_df = assembler.transform(train_df)
 train_df = poly_expansion.transform(train_df)
 train_df = scaler.fit(train_df).transform(train_df).select("features", "trip_duration")
@@ -136,10 +133,8 @@ model = lr.fit(train_df)
 # ------------------------
 # 5. Evaluation
 # ------------------------
-# Validate the model
 validation_predictions = model.transform(validation_df)
 
-# Evaluate using RMSE, MAE, and R²
 def evaluate_model(predictions, label_col="trip_duration", prediction_col="prediction"):
     evaluator_rmse = RegressionEvaluator(labelCol=label_col, predictionCol=prediction_col, metricName="rmse")
     evaluator_mae = RegressionEvaluator(labelCol=label_col, predictionCol=prediction_col, metricName="mae")
@@ -155,12 +150,27 @@ print("Validation Metrics:")
 for metric, value in validation_metrics.items():
     print(f"{metric}: {value}")
 
-# Test the model
 test_predictions = model.transform(test_df)
 test_metrics = evaluate_model(test_predictions, label_col="trip_duration", prediction_col="prediction")
 print("Test Metrics:")
 for metric, value in test_metrics.items():
     print(f"{metric}: {value}")
+    
+def plot_predictions_vs_actual(predictions_df, label_col="trip_duration", prediction_col="prediction"):
+    actual = predictions_df.select(label_col).toPandas()[label_col]
+    predicted = predictions_df.select(prediction_col).toPandas()[prediction_col]
+    plt.figure(figsize=(6, 4))
+    plt.scatter(actual, predicted, alpha=0.6, color='b', label='Predicted vs Actual')
+    plt.plot([min(actual), max(actual)], [min(actual), max(actual)], color='r', label='Perfect Prediction')
+    plt.xlabel('Actual Trip Duration')
+    plt.ylabel('Predicted Trip Duration')
+    plt.title('Prediction vs Actual Trip Duration (Validation Set)')
+    plt.legend()
+    plt.xlim(0, 6000)
+    plt.ylim(0, 5000)
+    plt.savefig('prediction_vs_actual.png')
+    plt.show()
 
-# Stop Spark Session
+plot_predictions_vs_actual(validation_predictions)
+
 spark.stop()
