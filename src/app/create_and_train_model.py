@@ -99,7 +99,7 @@ validation_df = enhance_features(validation_df)
 test_df = enhance_features(test_df)
 
 # ------------------------
-# 3. Polynomial Expansion
+# 3. Polynomial Expansion (degree=3)
 # ------------------------
 # Define feature columns
 base_feature_cols = [
@@ -109,7 +109,7 @@ base_feature_cols = [
 assembler = VectorAssembler(inputCols=base_feature_cols, outputCol="raw_features")
 
 # Polynomial expansion to add non-linear feature interactions
-poly_expansion = PolynomialExpansion(degree=2, inputCol="raw_features", outputCol="expanded_features")
+poly_expansion = PolynomialExpansion(degree=3, inputCol="raw_features", outputCol="expanded_features")
 
 # Standardization of expanded features
 scaler = StandardScaler(inputCol="expanded_features", outputCol="features", withStd=True, withMean=True)
@@ -128,9 +128,8 @@ test_df = poly_expansion.transform(test_df)
 test_df = scaler.fit(test_df).transform(test_df).select("features", "trip_duration")
 
 # ------------------------
-# 4. Modeling
+# 4. Regularization - Linear Regression Model
 # ------------------------
-# Train a linear regression model with optimized parameters
 lr = LinearRegression(featuresCol="features", labelCol="trip_duration", maxIter=100, regParam=0.05, elasticNetParam=0.3)
 model = lr.fit(train_df)
 
@@ -162,10 +161,6 @@ test_metrics = evaluate_model(test_predictions, label_col="trip_duration", predi
 print("Test Metrics:")
 for metric, value in test_metrics.items():
     print(f"{metric}: {value}")
-
-# Model Coefficients and Intercept
-print(f"Coefficients: {model.coefficients}")
-print(f"Intercept: {model.intercept}")
 
 # Stop Spark Session
 spark.stop()
