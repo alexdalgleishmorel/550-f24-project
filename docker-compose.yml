@@ -1,0 +1,12 @@
+version: '3.8'
+
+services:
+  python-app:
+    build:
+      context: ./src
+      dockerfile: Dockerfile
+    container_name: python-app
+    volumes:
+      - ./src/app:/app
+      - ./data:/data
+    working_dir: /app
