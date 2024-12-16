@@ -2,11 +2,16 @@ from pyspark.sql import SparkSession
 from pyspark.sql import functions as Functions
 from pyspark.sql.functions import col
 from pyspark.ml.feature import VectorAssembler
-from pyspark.ml.regression import LinearRegression
+from pyspark.ml.regression import RandomForestRegressor
 from pyspark.ml.evaluation import RegressionEvaluator
+import matplotlib.pyplot as plt
 
 spark = SparkSession.builder \
     .appName("Linear Regression Model Training") \
+    .config("spark.executor.memory", "4g") \
+    .config("spark.driver.memory", "4g") \
+    .config("spark.executor.cores", "4") \
+    .config("spark.num.executors", "4") \
     .getOrCreate()
 
 train_path = "../data/training.csv"
@@ -32,10 +37,20 @@ def transform_data(df):
     df =df.withColumn('pickup_time', Functions.month(col('pickup_datetime')))
     df =df.withColumn('pickup_hour', Functions.hour(Functions.col('pickup_datetime'))) 
     df =df.withColumn('pickup_minute', Functions.minute(Functions.col('pickup_datetime'))) 
-    df =df.withColumn('isRushhour',Functions.when((Functions.hour(Functions.col('pickup_datetime')).between(8, 9)) & (Functions.dayofweek(Functions.col('pickup_datetime')).between(2, 6)), 1).when((Functions.hour(Functions.col('pickup_datetime')).between(15, 19)) & (Functions.dayofweek(Functions.col('pickup_datetime')).between(2, 6)), 1).otherwise(0))
+    df =df.withColumn('isRushhour',Functions.when((Functions.hour(Functions.col('pickup_datetime')).between(7, 9)) & (Functions.dayofweek(Functions.col('pickup_datetime')).between(2, 6)), 1).when((Functions.hour(Functions.col('pickup_datetime')).between(15, 19)) & (Functions.dayofweek(Functions.col('pickup_datetime')).between(2, 6)), 1).otherwise(0))
     return df
 
+def evaluate_model(predictions, label_col="trip_duration", prediction_col="prediction"):
+    evaluator_rmse = RegressionEvaluator(labelCol=label_col, predictionCol=prediction_col, metricName="rmse")
+    evaluator_mae = RegressionEvaluator(labelCol=label_col, predictionCol=prediction_col, metricName="mae")
+    evaluator_r2 = RegressionEvaluator(labelCol=label_col, predictionCol=prediction_col, metricName="r2")
+    
+    rmse = evaluator_rmse.evaluate(predictions)
+    mae = evaluator_mae.evaluate(predictions)
+    r2 = evaluator_r2.evaluate(predictions)
+    return {"RMSE": rmse, "MAE": mae, "R²": r2}
 
+# LOAD DATA INTO DATAFRAMES AND TRANSFORM
 train_df = load_data(train_path)
 train_df = transform_data(train_df)
 
@@ -46,7 +61,7 @@ test_df = load_data(test_path)
 test_df = transform_data(test_df)
 
 # DEFINING FEATURES
-feature_cols = ["manhattan_distance", "passenger_count", "pickup_day", "pickup_month", "isWeekend", "pickup_hour", "isRushhour"]
+feature_cols = ["manhattan_distance", "pickup_weekday", "passenger_count", "pickup_day", "pickup_month", "pickup_hour", "pickup_minute"]
 
 assembler = VectorAssembler(inputCols=feature_cols, outputCol="features")
 
@@ -55,24 +70,43 @@ validation_df = assembler.transform(validation_df).select("features", "trip_dura
 test_df = assembler.transform(test_df).select("features", "trip_duration")
 
 # TRAINING LINEAR REGRESSION MODEL
-lr = LinearRegression(featuresCol="features", labelCol="trip_duration", maxIter=100, regParam=0.05, elasticNetParam=0.8)
+lr = RandomForestRegressor(featuresCol="features", labelCol="trip_duration", numTrees=100, maxDepth=10,minInstancesPerNode=2)
 model = lr.fit(train_df)
 
 # VALIDATING MODEL
 validation_predictions = model.transform(validation_df)
-evaluator = RegressionEvaluator(labelCol="trip_duration", predictionCol="prediction", metricName="rmse")
-validation_rmse = evaluator.evaluate(validation_predictions)
-print(f"Validation RMSE: {validation_rmse}")
+validation_metrics = evaluate_model(validation_predictions)
+print("Validation Metrics:")
+for metric, value in validation_metrics.items():
+    print(f"{metric}: {value}")
 
 # EVALUATE USING TEST DATA SET
 test_predictions = model.transform(test_df)
-predictions = test_predictions.toPandas()
-predictions.to_csv('predictions.csv', index=False)
-test_rmse = evaluator.evaluate(test_predictions)
-print(f"Test RMSE: {test_rmse}")
+test_metrics = evaluate_model(test_predictions)
+print("Test Metrics:")
+for metric, value in test_metrics.items():
+    print(f"{metric}: {value}")
 
 # OUTPUT METRICS ON MODEL
-print(f"Coefficients: {model.coefficients}")
-print(f"Intercept: {model.intercept}")
+def plot_predictions_vs_actual(predictions_df, label_col="trip_duration", prediction_col="prediction"):
+    actual = predictions_df.select(label_col).toPandas()[label_col]
+    predicted = predictions_df.select(prediction_col).toPandas()[prediction_col]
+    plt.figure(figsize=(6, 4))
+    plt.scatter(actual, predicted, alpha=0.6, color='b', label='Predicted vs Actual')
+    plt.plot([min(actual), max(actual)], [min(actual), max(actual)], color='r', label='Perfect Prediction')
+    plt.xlabel('Actual Trip Duration')
+    plt.ylabel('Predicted Trip Duration')
+    plt.title('Prediction vs Actual Trip Duration (Validation Set)')
+    plt.legend()
+    plt.xlim(0, 6000)
+    plt.ylim(0, 5000)
+    plt.savefig('prediction_vs_actual.png')
+    plt.show()
+
+plot_predictions_vs_actual(validation_predictions)
+
+print("Feature Importances:")
+for feature, importance in zip(feature_cols, model.featureImportances):
+    print(f"{feature}: {importance}")
 
 spark.stop()
