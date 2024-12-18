@@ -1,9 +1,24 @@
+import os
+
+# Set JAVA_HOME and update PATH
+os.environ["JAVA_HOME"] = "/usr/lib/jvm/java-17-openjdk-arm64"
+os.environ["PATH"] = f"{os.environ['JAVA_HOME']}/bin:{os.environ['PATH']}"
+
 from pyspark.sql import SparkSession
 import matplotlib.pyplot as plt
-from pyspark.sql.functions import to_timestamp, unix_timestamp, abs, col, hour, dayofweek, when, month, quarter, lit, sin, cos, radians, sqrt, atan2
+from pyspark.sql.functions import to_timestamp, unix_timestamp, abs, col, hour, dayofweek, when, month, quarter, lit, sin, cos, radians, sqrt, atan2, udf
+from pyspark.sql.types import DoubleType
 from pyspark.ml.feature import VectorAssembler, PolynomialExpansion, StandardScaler
 from pyspark.ml.regression import LinearRegression
 from pyspark.ml.evaluation import RegressionEvaluator
+
+# Manhattan distance
+def manhattan_distance(lat1, lon1, lat2, lon2):
+    lat_dist = abs(lat2 - lat1) * 111
+    lon_dist = abs(lon2 - lon1) * 85
+    return lat_dist + lon_dist
+
+manhattan_udf = udf(lambda lat1, lon1, lat2, lon2: manhattan_distance(lat1, lon1, lat2, lon2), DoubleType())
 
 # Initialize Spark Session
 spark = SparkSession.builder \
@@ -91,6 +106,12 @@ def enhance_features(df):
                 | (col("hour_of_day").between(16, 19)),
                 1,
             ).otherwise(0),
+        )
+        .withColumn(
+            "manhattan_distance",
+            manhattan_udf(
+                col("pickup_latitude"), col("pickup_longitude"), col("dropoff_latitude"), col("dropoff_longitude")
+            )
         )
     )
 
