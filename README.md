@@ -41,3 +41,7 @@ To reset and re-create containers, run:
 docker compose down
 docker compose up --build -d
 ```
+
+## Pipeline Overview
+
+![pipeline drawio](https://github.com/user-attachments/assets/2ae275eb-84b4-466b-83ba-3f7a35bade30)
