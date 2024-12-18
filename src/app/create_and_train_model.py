@@ -6,19 +6,10 @@ os.environ["PATH"] = f"{os.environ['JAVA_HOME']}/bin:{os.environ['PATH']}"
 
 from pyspark.sql import SparkSession
 import matplotlib.pyplot as plt
-from pyspark.sql.functions import to_timestamp, unix_timestamp, abs, col, hour, dayofweek, when, month, quarter, lit, sin, cos, radians, sqrt, atan2, udf
-from pyspark.sql.types import DoubleType
+from pyspark.sql.functions import to_timestamp, unix_timestamp, abs, col, hour, dayofweek, when, month, quarter, lit, sin, cos, radians, sqrt, atan2
 from pyspark.ml.feature import VectorAssembler, PolynomialExpansion, StandardScaler
 from pyspark.ml.regression import LinearRegression
 from pyspark.ml.evaluation import RegressionEvaluator
-
-# Manhattan distance
-def manhattan_distance(lat1, lon1, lat2, lon2):
-    lat_dist = abs(lat2 - lat1) * 111
-    lon_dist = abs(lon2 - lon1) * 85
-    return lat_dist + lon_dist
-
-manhattan_udf = udf(lambda lat1, lon1, lat2, lon2: manhattan_distance(lat1, lon1, lat2, lon2), DoubleType())
 
 # Initialize Spark Session
 spark = SparkSession.builder \
@@ -107,12 +98,6 @@ def enhance_features(df):
                 1,
             ).otherwise(0),
         )
-        .withColumn(
-            "manhattan_distance",
-            manhattan_udf(
-                col("pickup_latitude"), col("pickup_longitude"), col("dropoff_latitude"), col("dropoff_longitude")
-            )
-        )
     )
 
 
@@ -193,5 +178,16 @@ def plot_predictions_vs_actual(predictions_df, label_col="trip_duration", predic
     plt.show()
 
 plot_predictions_vs_actual(validation_predictions)
+
+def display_feature_importances(model, feature_columns):
+    coefficients = model.coefficients.toArray()
+    feature_importances = [(feature, __builtins__.abs(coef)) for feature, coef in zip(feature_columns, coefficients)]
+    feature_importances = sorted(feature_importances, key=lambda x: x[1], reverse=True)
+
+    print("\nFeature Importances (Top 10):")
+    for feature, importance in feature_importances[:10]:
+        print(f"{feature}: {importance:.4f}")
+
+display_feature_importances(model, base_feature_cols)
 
 spark.stop()
