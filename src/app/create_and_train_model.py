@@ -1,6 +1,6 @@
 import os
 
-# Set JAVA_HOME and update PATH
+# Setting JAVA_HOME and updating PATH
 os.environ["JAVA_HOME"] = "/usr/lib/jvm/java-17-openjdk-arm64"
 os.environ["PATH"] = f"{os.environ['JAVA_HOME']}/bin:{os.environ['PATH']}"
 
@@ -11,7 +11,7 @@ from pyspark.ml.feature import VectorAssembler, PolynomialExpansion, StandardSca
 from pyspark.ml.regression import LinearRegression
 from pyspark.ml.evaluation import RegressionEvaluator
 
-# Initialize Spark Session
+# Initializing Spark Session
 spark = SparkSession.builder \
     .appName("Enhanced Linear Regression Model") \
     .getOrCreate()
@@ -21,7 +21,7 @@ train_path = "../data/training.csv"
 validation_path = "../data/validation.csv"
 test_path = "../data/test.csv"
 
-# Load data
+# Loading data
 def load_data(file_path):
     return spark.read.csv(file_path, header=True, inferSchema=True)
 
@@ -43,7 +43,7 @@ train_df = clean_data(train_df)
 validation_df = clean_data(validation_df)
 test_df = clean_data(test_df)
 
-# Add Unix timestamp for pickup_datetime
+# Adding Unix timestamp for pickup_datetimes
 train_df = train_df.withColumn("pickup_datetime_numeric", unix_timestamp("pickup_datetime"))
 validation_df = validation_df.withColumn("pickup_datetime_numeric", unix_timestamp("pickup_datetime"))
 test_df = test_df.withColumn("pickup_datetime_numeric", unix_timestamp("pickup_datetime"))

@@ -17,15 +17,15 @@ To bash into the container:
 docker exec -it python-app bash
 ```
 
-***For PySpark to work on the container, you need to run:***
+Then, [download the training data](https://www.kaggle.com/c/nyc-taxi-trip-duration/data) and add it the the `/data` directory as `raw.csv`.
+
+Run this to setup the training, validation and test data:
+
 ```
-export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-arm64
-export PATH=$JAVA_HOME/bin:$PATH
+python split_raw_data.py
 ```
 
-> This above command may differ on your machine, just check what's in `/usr/lib/jvm/` on the container.
-
-Then you can run any python files here in the intial directory, for example:
+Run this to train the model and have it predict on the test data:
 
 ```
 python create_and_train_model.py
